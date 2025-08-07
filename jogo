@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Torreta Pixel Art</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #222;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: 'Courier New', monospace;
+        }
+        
+        #gameContainer {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background-color: #1a1a2e;
+            overflow: hidden;
+        }
+        
+        #turret {
+            position: absolute;
+            left: 50px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 40px;
+            height: 40px;
+            background-color: #555;
+            z-index: 10;
+        }
+        
+        #turret::before {
+            content: '';
+            position: absolute;
+            left: 40px;
+            top: 15px;
+            width: 30px;
+            height: 10px;
+            background-color: #777;
+            z-index: 11;
+        }
+        
+        #turretHead {
+            position: absolute;
+            left: 70px;
+            top: 15px;
+            width: 15px;
+            height: 15px;
+            background-color: #f00;
+            transform-origin: left center;
+            z-index: 12;
+        }
+        
+        .enemy {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            background-color: #f00;
+            image-rendering: pixelated;
+            z-index: 5;
+        }
+        
+        .bullet {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background-color: #ff0;
+            border-radius: 50%;
+            z-index: 8;
+        }
+        
+        .explosion {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            background-color: #f80;
+            border-radius: 50%;
+            opacity: 0;
+            z-index: 9;
+            animation: explode 0.5s forwards;
+        }
+        
+        @keyframes explode {
+            0% { transform: scale(0.1); opacity: 1; }
+            100% { transform: scale(2); opacity: 0; }
+        }
+        
+        #scoreDisplay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #fff;
+            font-size: 24px;
+            z-index: 20;
+        }
+        
+        #timeDisplay {
+            position: absolute;
+            top: 50px;
+            left: 20px;
+            color: #fff;
+            font-size: 24px;
+            z-index: 20;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div id="turret"></div>
+        <div id="turretHead"></div>
+        <div id="scoreDisplay">Pontos: 0</div>
+        <div id="timeDisplay">Tempo: 0</div>
+    </div>
+
+    <script>
+        // Configurações do jogo
+        const gameConfig = {
+            spawnRate: 2000, // Tempo inicial entre spawns (ms)
+            minSpawnRate: 500, // Taxa mínima de spawn
+            spawnRateDecrease: 100, // Quanto diminui a cada nível
+            spawnRateChangeInterval: 10000, // A cada quanto tempo aumenta dificuldade (ms)
+            enemySpeed: 1, // Velocidade base dos inimigos
+            maxEnemies: 20, // Máximo de inimigos na tela
+            bulletSpeed: 10, // Velocidade da bala
+            turretRotationSpeed: 0.1 // Velocidade de rotação da torreta
+        };
+
+        // Elementos do DOM
+        const gameContainer = document.getElementById('gameContainer');
+        const turretHead = document.getElementById('turretHead');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const timeDisplay = document.getElementById('timeDisplay');
+
+        // Estado do jogo
+        let score = 0;
+        let gameTime = 0;
+        let enemies = [];
+        let bullets = [];
+        let explosions = [];
+        let mouseX = 0;
+        let mouseY = 0;
+        let currentAngle = 0;
+        let targetAngle = 0;
+        let lastShotTime = 0;
+        let currentSpawnRate = gameConfig.spawnRate;
+        let lastSpawnTime = 0;
+        let lastDifficultyIncrease = 0;
+
+        // Matrizes para cálculo de dano
+        const attackMatrices = {
+            basic: [
+                [1, 0.5, 0.2],
+                [0.5, 1, 0.5],
+                [0.2, 0.5, 1]
+            ]
+        };
+
+        const defenseMatrices = [
+            // Inimigo básico
+            [
+                [0.8, 0.3, 0.1],
+                [0.3, 0.8, 0.3],
+                [0.1, 0.3, 0.8]
+            ],
+            // Inimigo médio
+            [
+                [0.5, 0.6, 0.4],
+                [0.6, 0.5, 0.6],
+                [0.4, 0.6, 0.5]
+            ],
+            // Inimigo forte
+            [
+                [0.3, 0.4, 0.7],
+                [0.4, 0.3, 0.4],
+                [0.7, 0.4, 0.3]
+            ]
+        ];
+
+        // Inicializa o jogo
+        function initGame() {
+            // Configura listeners
+            gameContainer.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('keydown', handleKeyDown);
+            
+            // Inicia o loop do jogo
+            requestAnimationFrame(gameLoop);
+            
+            // Inicia o contador de tempo
+            setInterval(() => {
+                gameTime++;
+                timeDisplay.textContent = `Tempo: ${gameTime}`;
+                
+                // Aumenta a dificuldade a cada intervalo
+                if (gameTime % (gameConfig.spawnRateChangeInterval / 1000) === 0) {
+                    increaseDifficulty();
+                }
+            }, 1000);
+        }
+
+        // Aumenta a dificuldade do jogo
+        function increaseDifficulty() {
+            currentSpawnRate = Math.max(
+                gameConfig.minSpawnRate,
+                currentSpawnRate - gameConfig.spawnRateDecrease
+            );
+        }
+
+        // Manipula movimento do mouse
+        function handleMouseMove(e) {
+            const rect = gameContainer.getBoundingClientRect();
+            mouseX = e.clientX - rect.left;
+            mouseY = e.clientY - rect.top;
+            
+            // Calcula o ângulo para a torreta apontar para o mouse
+            const turretX = 50 + 40 + 30 + 7.5; // Posição da ponta da torreta
+            const turretY = gameContainer.clientHeight / 2;
+            
+            const dx = mouseX - turretX;
+            const dy = mouseY - turretY;
+            
+            targetAngle = Math.atan2(dy, dx);
+        }
+
+        // Manipula tecla pressionada
+        function handleKeyDown(e) {
+            if (e.code === 'Space') {
+                shoot();
+            }
+        }
+
+        // Dispara um projétil
+        function shoot() {
+            const now = Date.now();
+            if (now - lastShotTime < 100) return; // Limita taxa de tiro
+            
+            lastShotTime = now;
+            
+            const turretTipX = 50 + 40 + 30 + 7.5; // Posição da ponta da torreta
+            const turretTipY = gameContainer.clientHeight / 2;
+            
+            const bullet = document.createElement('div');
+            bullet.className = 'bullet';
+            bullet.style.left = `${turretTipX}px`;
+            bullet.style.top = `${turretTipY}px`;
+            gameContainer.appendChild(bullet);
+            
+            bullets.push({
+                element: bullet,
+                x: turretTipX,
+                y: turretTipY,
+                vx: Math.cos(currentAngle) * gameConfig.bulletSpeed,
+                vy: Math.sin(currentAngle) * gameConfig.bulletSpeed
+            });
+        }
+
+        // Cria um novo inimigo
+        function spawnEnemy() {
+            const now = Date.now();
+            if (now - lastSpawnTime < currentSpawnRate) return;
+            if (enemies.length >= gameConfig.maxEnemies) return;
+            
+            lastSpawnTime = now;
+            
+            const enemyType = Math.floor(Math.random() * defenseMatrices.length);
+            const enemyY = Math.random() * (gameContainer.clientHeight - 30);
+            
+            const enemy = document.createElement('div');
+            enemy.className = 'enemy';
+            
+            // Cor baseada no tipo de inimigo
+            const colors = ['#f00', '#0f0', '#00f'];
+            enemy.style.backgroundColor = colors[enemyType];
+            
+            enemy.style.left = `${gameContainer.clientWidth}px`;
+            enemy.style.top = `${enemyY}px`;
+            gameContainer.appendChild(enemy);
+            
+            enemies.push({
+                element: enemy,
+                x: gameContainer.clientWidth,
+                y: enemyY,
+                type: enemyType,
+                hp: (enemyType + 1) * 10, // Vida baseada no tipo
+                speed: gameConfig.enemySpeed * (0.8 + Math.random() * 0.4) // Velocidade aleatória
+            });
+        }
+
+        // Calcula dano usando multiplicação de matrizes
+        function calculateDamage(attackMatrix, defenseMatrix) {
+            let damage = 0;
+            
+            // Multiplicação de matrizes simplificada (soma dos produtos)
+            for (let i = 0; i < attackMatrix.length; i++) {
+                for (let j = 0; j < attackMatrix[i].length; j++) {
+                    damage += attackMatrix[i][j] * defenseMatrix[i][j];
+                }
+            }
+            
+            return damage * 5; // Ajuste para valores de dano razoáveis
+        }
+
+        // Cria uma explosão
+        function createExplosion(x, y) {
+            const explosion = document.createElement('div');
+            explosion.className = 'explosion';
+            explosion.style.left = `${x - 15}px`;
+            explosion.style.top = `${y - 15}px`;
+            gameContainer.appendChild(explosion);
+            
+            explosions.push({
+                element: explosion,
+                time: 0
+            });
+            
+            // Remove a explosão após a animação
+            setTimeout(() => {
+                explosion.remove();
+            }, 500);
+        }
+
+        // Loop principal do jogo
+        function gameLoop() {
+            // Atualiza rotação da torreta suavemente
+            currentAngle += (targetAngle - currentAngle) * gameConfig.turretRotationSpeed;
+            turretHead.style.transform = `rotate(${currentAngle}rad)`;
+            
+            // Spawn de inimigos
+            spawnEnemy();
+            
+            // Atualiza inimigos
+            enemies.forEach((enemy, index) => {
+                enemy.x -= enemy.speed;
+                enemy.element.style.left = `${enemy.x}px`;
+                
+                // Remove inimigos que saíram da tela
+                if (enemy.x < -30) {
+                    enemy.element.remove();
+                    enemies.splice(index, 1);
+                }
+            });
+            
+            // Atualiza projéteis
+            bullets.forEach((bullet, index) => {
+                bullet.x += bullet.vx;
+                bullet.y += bullet.vy;
+                bullet.element.style.left = `${bullet.x}px`;
+                bullet.element.style.top = `${bullet.y}px`;
+                
+                // Remove projéteis que saíram da tela
+                if (bullet.x < 0 || bullet.x > gameContainer.clientWidth || 
+                    bullet.y < 0 || bullet.y > gameContainer.clientHeight) {
+                    bullet.element.remove();
+                    bullets.splice(index, 1);
+                    return;
+                }
+                
+                // Verifica colisão com inimigos
+                enemies.forEach((enemy, enemyIndex) => {
+                    if (isColliding(bullet, enemy)) {
+                        // Calcula dano
+                        const damage = calculateDamage(
+                            attackMatrices.basic, 
+                            defenseMatrices[enemy.type]
+                        );
+                        
+                        enemy.hp -= damage;
+                        
+                        // Cria explosão
+                        createExplosion(bullet.x, bullet.y);
+                        
+                        // Remove o projétil
+                        bullet.element.remove();
+                        bullets.splice(index, 1);
+                        
+                        // Verifica se inimigo morreu
+                        if (enemy.hp <= 0) {
+                            enemy.element.remove();
+                            enemies.splice(enemyIndex, 1);
+                            score += (enemy.type + 1) * 10;
+                            scoreDisplay.textContent = `Pontos: ${score}`;
+                        }
+                        
+                        return;
+                    }
+                });
+            });
+            
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Verifica colisão entre dois objetos
+        function isColliding(obj1, obj2) {
+            return obj1.x < obj2.x + 30 &&
+                   obj1.x + 8 > obj2.x &&
+                   obj1.y < obj2.y + 30 &&
+                   obj1.y + 8 > obj2.y;
+        }
+
+        // Inicia o jogo quando a página carregar
+        window.onload = initGame;
+    </script>
+</body>
+</html>
