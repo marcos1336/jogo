@@ -1,1 +1,750 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Torreta Pixel Art</title>
+  <meta name="description" content="Defenda a nave espacial de meteoros com duas torretas num espaço retrô pixel art." />
+  <style>
+    :root {
+      --bg-1: #0b0f1b;
+      --bg-2: #141a2e;
+      --accent: #ffcf33;
+      --accent-2: #ff5e66;
+      --good: #35d07f;
+      --warn: #ffc233;
+      --bad: #ff3b3b;
+      --panel: #101426cc;
+      --text: #e8e8f0;
+      --muted: #aab;
+    }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      background: radial-gradient(1200px 800px at 30% 20%, #1b2140 0%, var(--bg-2) 45%, var(--bg-1) 100%);
+      color: var(--text);
+      font-family: "Courier New", Courier, monospace;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      overflow: hidden;
+    }
+    .wrap { position: relative; width: 100vw; height: 100vh; }
+    canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+    header.app-bar {
+      position: absolute; top: 12px; left: 12px; right: 12px;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      z-index: 10; pointer-events: none;
+    }
+    .brand {
+      display: inline-flex; align-items: center; gap: 10px;
+      background: var(--panel); border: 1px solid #2a3357; border-radius: 10px;
+      padding: 10px 14px; box-shadow: 0 6px 20px #00000066, inset 0 1px 0 #ffffff0f; pointer-events: auto;
+    }
+    .brand .dot { width: 10px; height: 10px; background: linear-gradient(180deg, #fff 0%, var(--accent) 100%); border-radius: 50%; box-shadow: 0 0 8px var(--accent); }
+    .brand h1 { margin: 0; font-size: clamp(16px, 2vw, 20px); letter-spacing: 1px; color: #f6f7ff; text-shadow: 2px 2px 0 #000; }
+    .hud { display: inline-flex; gap: 10px; align-items: center; background: var(--panel); border: 1px solid #2a3357; border-radius: 10px; padding: 8px 10px; pointer-events: auto; }
+    .hud .pill {
+      display: inline-flex; align-items: center; gap: 8px; background: #0f1633cc; border: 1px solid #28325a;
+      border-radius: 8px; padding: 6px 10px; min-width: 110px; justify-content: center; color: #e8ebff; text-shadow: 1px 1px 0 #000;
+    }
+    .health {
+      position: absolute; top: 60px; left: 12px; z-index: 10;
+      background: var(--panel); border: 1px solid #2a3357; border-radius: 10px; padding: 10px; min-width: min(380px, 70vw);
+      box-shadow: 0 6px 20px #00000066, inset 0 1px 0 #ffffff0f;
+    }
+    .health .label { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    .bar { width: 100%; height: 18px; background: #0a0f25; border: 1px solid #28325a; border-radius: 999px; overflow: hidden; position: relative; }
+    .bar-fill {
+      height: 100%; width: 100%; border-radius: 999px;
+      background: linear-gradient(90deg, #24c46b 0%, #2ae98b 100%); box-shadow: inset 0 -4px 6px #00000055, 0 0 10px #22ff9977;
+      transition: width 180ms ease;
+    }
+    .controls { display: inline-flex; align-items: center; gap: 8px; background: var(--panel); border: 1px solid #2a3357; border-radius: 10px; padding: 8px; pointer-events: auto; }
+    .btn {
+      appearance: none; border: 1px solid #334075; background: linear-gradient(180deg, #1a2247 0%, #0f1533 100%); color: #f3f5ff;
+      border-radius: 8px; padding: 8px 12px; font-family: inherit; font-size: 14px; letter-spacing: 0.5px; cursor: pointer;
+      box-shadow: 0 8px 18px #00000066, inset 0 1px 0 #ffffff1a; transition: transform 80ms ease, filter 120ms ease, box-shadow 120ms ease;
+    }
+    .btn:hover { filter: brightness(1.08); }
+    .btn:active { transform: translateY(1px); }
+    .modal {
+      position: absolute; inset: 0; display: none; align-items: center; justify-content: center; z-index: 20;
+      background: radial-gradient(800px 600px at 50% 50%, #0b0f1bcc 0%, #000a 60%, #000e 100%); backdrop-filter: blur(2px);
+    }
+    .modal.show { display: flex; }
+    .panel {
+      background: linear-gradient(180deg, #0f1533f5, #0a0f25f5); border: 1px solid #36407c; border-radius: 14px;
+      padding: clamp(16px, 3vw, 24px); width: min(680px, 92vw); box-shadow: 0 20px 60px #000a, inset 0 1px 0 #ffffff1a;
+    }
+    .panel h2 { margin: 0 0 10px 0; font-size: clamp(20px, 4vw, 28px); color: #f4f6ff; text-shadow: 2px 2px 0 #000; }
+    .panel p { margin: 0 0 14px 0; color: #cbd3ff; line-height: 1.5; }
+    .panel .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-top: 10px; }
+    .kbd { display: inline-block; border: 1px solid #3a457d; border-radius: 6px; padding: 4px 6px; font-size: 12px; background: #0c1230; color: #e9ecff; box-shadow: inset 0 1px 0 #ffffff14; }
+    .help {
+      position: absolute; bottom: 10px; left: 12px; right: 12px; display: flex; justify-content: space-between;
+      gap: 10px; color: #94a0e6; font-size: 12px; opacity: 0.9; z-index: 10; text-shadow: 1px 1px 0 #000; pointer-events: none;
+    }
+    .sr-only {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap" id="wrap">
+    <canvas id="bg" aria-hidden="true"></canvas>
+    <canvas id="game" role="img" aria-label="Duas torretas defendendo uma nave espacial de meteoros."></canvas>
 
+    <header class="app-bar" aria-label="Informações e Controles do Jogo">
+      <div class="brand" aria-label="Título do Jogo">
+        <span class="dot" aria-hidden="true"></span>
+        <h1>Torreta Pixel Art</h1>
+      </div>
+      <div class="hud" aria-live="polite">
+        <div class="pill" aria-label="Pontuação atual"><strong>Pontos:</strong> <span id="scoreText">0</span></div>
+        <div class="pill" aria-label="Tempo de jogo"><strong>Tempo:</strong> <span id="timeText">0</span>s</div>
+        <div class="pill" aria-label="Recorde"><strong>Recorde:</strong> <span id="highText">0</span></div>
+        <div class="pill" aria-label="Intensidade"><strong>Intensidade:</strong> <span id="intensityText">0%</span></div>
+      </div>
+      <div class="controls" aria-label="Controles">
+        <button class="btn" id="pauseBtn" aria-pressed="false">Pausar</button>
+        <button class="btn" id="muteBtn" aria-pressed="false">Som: On</button>
+        <button class="btn" id="restartBtn">Reiniciar</button>
+      </div>
+    </header>
+
+    <section class="health" aria-label="Vida da nave">
+      <div class="label">Vida da nave</div>
+      <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100" aria-label="Vida restante">
+        <div class="bar-fill" id="healthFill"></div>
+      </div>
+    </section>
+
+    <div class="help" aria-hidden="true">
+      <div>Segure clique/toque para auto-disparo. Mire para onde quer acertar.</div>
+      <div>Os meteoros maiores se fragmentam. Proteja a nave!</div>
+    </div>
+
+    <div class="modal show" id="startModal" aria-modal="true" role="dialog" aria-labelledby="startTitle">
+      <div class="panel">
+        <h2 id="startTitle">Defenda a nave!</h2>
+        <p>As torretas protegem a nave atrás delas. Mire com o mouse (ou toque) e dispare para destruir os meteoros antes que atinjam a nave.</p>
+        <p>Controles: <span class="kbd">Clique</span>/<span class="kbd">Toque</span> Disparar, <span class="kbd">P</span> Pausar, <span class="kbd">M</span> Mudo, <span class="kbd">R</span> Reiniciar</p>
+        <div class="row">
+          <button class="btn" id="startBtn" aria-label="Começar o jogo agora">Começar</button>
+          <span style="color:#9fb2ff">Boa sorte, comandante.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal" id="gameOverModal" aria-modal="true" role="dialog" aria-labelledby="overTitle">
+      <div class="panel">
+        <h2 id="overTitle">Game Over</h2>
+        <p id="finalStats">Pontuação: 0 • Tempo: 0s • Recorde: 0</p>
+        <div class="row">
+          <button class="btn" id="againBtn" aria-label="Jogar novamente">Jogar novamente</button>
+          <button class="btn" id="shareBtn" aria-label="Compartilhar pontuação">Compartilhar</button>
+        </div>
+      </div>
+    </div>
+
+    <p class="sr-only" id="sr-updates" aria-live="polite"></p>
+  </div>
+
+  <script>
+    const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+    const rand = (a, b) => a + Math.random() * (b - a);
+    const randi = (a, b) => Math.floor(rand(a, b + 1));
+
+    const wrap = document.getElementById('wrap');
+    const bg = document.getElementById('bg');
+    const fg = document.getElementById('game');
+
+    const scoreText = document.getElementById('scoreText');
+    const timeText = document.getElementById('timeText');
+    const highText = document.getElementById('highText');
+    const intensityText = document.getElementById('intensityText');
+    const healthFill = document.getElementById('healthFill');
+
+    const pauseBtn = document.getElementById('pauseBtn');
+    const muteBtn = document.getElementById('muteBtn');
+    const restartBtn = document.getElementById('restartBtn');
+
+    const startModal = document.getElementById('startModal');
+    const gameOverModal = document.getElementById('gameOverModal');
+    const startBtn = document.getElementById('startBtn');
+    const againBtn = document.getElementById('againBtn');
+    const shareBtn = document.getElementById('shareBtn');
+    const finalStats = document.getElementById('finalStats');
+    const srLive = document.getElementById('sr-updates');
+
+    const bgCtx = bg.getContext('2d', { alpha: true });
+    const ctx = fg.getContext('2d', { alpha: true });
+
+    const CONFIG = {
+      spawnRate: 1.0, minSpawnRate: 0.25, spawnRateDecrease: 0.06, spawnRateChangeEvery: 5,
+      enemyBaseSpeed: 64, enemyVarSpeed: 42, enemyMax: 120,
+      bulletSpeed: 620, fireRate: 0.16,
+      turretHealthMax: 100, baseDamage: 7, damageVariance: 0.22,
+      turretOffset1: 0.15, turretOffset2px: 110, turretY: 0.5,
+      bulletRadius: 3,
+      starLayers: [
+        { count: 60, speed: 4, size: [1, 2], alpha: 0.8 },
+        { count: 90, speed: 12, size: [1, 2.5], alpha: 0.6 },
+        { count: 140, speed: 24, size: [0.8, 1.8], alpha: 0.45 },
+      ],
+      particlesPerHit: [9, 16],
+      bossEvery: 35, bossHp: 90, bossSpeed: 52,
+    };
+
+    const State = {
+      w: 0, h: 0, dpr: 1,
+      running: false, muted: false, started: false, over: false,
+      mouseX: 0, mouseY: 0, firing: false, touched: false,
+      score: 0, time: 0, high: 0, health: CONFIG.turretHealthMax,
+      spawnTimer: 0, currentSpawn: CONFIG.spawnRate, lastSpawnDecrease: 0, lastBossAt: 0,
+      enemies: [], bullets: [], particles: [], comets: [],
+      lastShot1: -999, lastShot2: -999,
+      angle1: 0, angle2: 0,
+      shakeT: 0, shakeA: 0,
+    };
+
+    const turretSVG = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="64" height="42" viewBox="0 0 64 42">
+        <rect x="0" y="0" width="64" height="42" fill="none"/>
+        <g>
+          <polygon points="8,21 32,10 56,21 32,32" fill="#cde2ff" stroke="#0a0e2a" stroke-width="2"/>
+          <rect x="10" y="16" width="8" height="10" fill="#82a4ff" stroke="#0a0e2a" stroke-width="2"/>
+          <rect x="46" y="16" width="8" height="10" fill="#82a4ff" stroke="#0a0e2a" stroke-width="2"/>
+          <rect x="29" y="17" width="6" height="8" fill="#ffcf33" stroke="#0a0e2a" stroke-width="2"/>
+          <circle cx="8" cy="21" r="3" fill="#ff5e66"/>
+        </g>
+      </svg>
+    `;
+    const turretImg = new Image();
+    turretImg.crossOrigin = "anonymous";
+    turretImg.src = "data:image/svg+xml;utf8," + encodeURIComponent(turretSVG);
+
+    const carrierImg = new Image();
+    carrierImg.crossOrigin = "anonymous";
+    carrierImg.src = "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/nave_espacial_alien%C3%ADgena_de_pixel_art__veh%C3%ADculo_de_juego_de_8_bits_ufo_sobre_fondo_blanco-removebg-preview-WEPp8bBAX0KwHW9QsF8VebM61J1lb4.png";
+    let carrierNaturalW = 577, carrierNaturalH = 432;
+    carrierImg.onload = () => {
+      carrierNaturalW = carrierImg.naturalWidth || carrierNaturalW;
+      carrierNaturalH = carrierImg.naturalHeight || carrierNaturalH;
+    };
+
+    let audioCtx = null;
+    const ensureAudio = () => { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); };
+    const sfxShoot = () => {
+      if (State.muted) return; ensureAudio();
+      const t = audioCtx.currentTime, o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = "square"; o.frequency.setValueAtTime(1200 + Math.random()*200, t);
+      g.gain.setValueAtTime(0.035, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+      o.connect(g).connect(audioCtx.destination); o.start(t); o.stop(t + 0.05);
+    };
+    const sfxExplosion = (dur = 0.25, gain = 0.06) => {
+      if (State.muted) return; ensureAudio();
+      const t = audioCtx.currentTime, size = audioCtx.sampleRate * dur;
+      const buf = audioCtx.createBuffer(1, size, audioCtx.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < size; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / size);
+      const src = audioCtx.createBufferSource(); src.buffer = buf;
+      const g = audioCtx.createGain(); g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      src.connect(g).connect(audioCtx.destination); src.start(t);
+    };
+
+    const Stars = [];
+    function initStars() {
+      Stars.length = 0;
+      for (const layer of CONFIG.starLayers) {
+        for (let i = 0; i < layer.count; i++) {
+          Stars.push({ x: Math.random() * State.w, y: Math.random() * State.h, z: layer.speed, s: rand(layer.size[0], layer.size[1]), a: layer.alpha });
+        }
+      }
+    }
+    function updateBg(dt) {
+      for (const st of Stars) {
+        st.x -= st.z * dt * 20;
+        if (st.x < 0) { st.x = State.w + rand(0, State.w*0.2); st.y = Math.random() * State.h; }
+      }
+      if (Math.random() < dt * 0.08 && State.comets.length < 3) spawnComet();
+      for (let i = State.comets.length - 1; i >= 0; i--) {
+        const c = State.comets[i];
+        c.x += c.vx * dt; c.y += c.vy * dt; c.life += dt;
+        if (c.x < -100 || c.y > State.h + 100 || c.life > c.max) State.comets.splice(i, 1);
+      }
+    }
+    function drawBg() {
+      bgCtx.clearRect(0, 0, State.w, State.h);
+      for (const st of Stars) {
+        bgCtx.globalAlpha = st.a; bgCtx.fillStyle = "#ffffff";
+        bgCtx.fillRect(Math.floor(st.x), Math.floor(st.y), st.s, st.s);
+      }
+      bgCtx.globalAlpha = 1;
+      const grd = bgCtx.createRadialGradient(State.w*0.75, State.h*0.3, 20, State.w*0.75, State.h*0.3, Math.max(State.w, State.h)*0.6);
+      grd.addColorStop(0, "rgba(120,95,255,0.08)"); grd.addColorStop(1, "rgba(0,0,0,0)");
+      bgCtx.fillStyle = grd; bgCtx.fillRect(0, 0, State.w, State.h);
+      for (const c of State.comets) {
+        bgCtx.save(); bgCtx.translate(c.x, c.y); bgCtx.rotate(Math.atan2(c.vy, c.vx));
+        const len = 80, thick = 3;
+        const grad = bgCtx.createLinearGradient(0, 0, -len, 0);
+        grad.addColorStop(0, "rgba(255,255,255,0.9)");
+        grad.addColorStop(1, "rgba(255,255,255,0)");
+        bgCtx.strokeStyle = grad; bgCtx.lineWidth = thick;
+        bgCtx.beginPath(); bgCtx.moveTo(0, 0); bgCtx.lineTo(-len, 0); bgCtx.stroke();
+        bgCtx.fillStyle = "#fff"; bgCtx.beginPath(); bgCtx.arc(0, 0, 2.5, 0, Math.PI*2); bgCtx.fill();
+        bgCtx.restore();
+      }
+    }
+    function spawnComet() {
+      State.comets.push({ x: State.w + 60, y: rand(0, State.h * 0.6), vx: -rand(180, 360), vy: rand(20, 60), life: 0, max: rand(3, 6) });
+    }
+
+    function resize() {
+      const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+      State.dpr = dpr;
+      State.w = wrap.clientWidth; State.h = wrap.clientHeight;
+      for (const c of [bg, fg]) {
+        c.width = Math.floor(State.w * dpr);
+        c.height = Math.floor(State.h * dpr);
+        c.style.width = State.w + "px";
+        c.style.height = State.h + "px";
+      }
+      bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.imageSmoothingEnabled = false;
+      initStars();
+    }
+    window.addEventListener('resize', resize, { passive: true });
+
+    function getTurrets() {
+      const y = State.h * CONFIG.turretY;
+      const x1 = State.w * CONFIG.turretOffset1;
+      const x2 = x1 + CONFIG.turretOffset2px;
+      const bob = Math.sin(State.time * 1.2) * 2;
+      return [{ x: x1, y: y + bob }, { x: x2, y: y + bob }];
+    }
+    function getCarrierRect() {
+      const [t1, t2] = getTurrets();
+      const cx = (t1.x + t2.x) / 2 + 12;
+      const cy = (t1.y + t2.y) / 2;
+      const spacing = Math.max(1, t2.x - t1.x);
+      const targetW = Math.min(spacing + 80, spacing * 1.6, State.w * 0.35);
+      const aspect = carrierNaturalW / carrierNaturalH;
+      const w = targetW;
+      const h = Math.round(w / aspect);
+      return { x: cx, y: cy, w, h };
+    }
+
+    wrap.addEventListener('mousemove', e => {
+      const rect = fg.getBoundingClientRect();
+      State.mouseX = (e.clientX - rect.left);
+      State.mouseY = (e.clientY - rect.top);
+    }, { passive: true });
+    wrap.addEventListener('mousedown', () => State.firing = true);
+    window.addEventListener('mouseup', () => State.firing = false);
+
+    wrap.addEventListener('touchstart', e => {
+      State.touched = true; State.firing = true;
+      const t = e.touches[0]; const rect = fg.getBoundingClientRect();
+      State.mouseX = (t.clientX - rect.left); State.mouseY = (t.clientY - rect.top);
+    }, { passive: true });
+    wrap.addEventListener('touchmove', e => {
+      const t = e.touches[0]; const rect = fg.getBoundingClientRect();
+      State.mouseX = (t.clientX - rect.left); State.mouseY = (t.clientY - rect.top);
+    }, { passive: true });
+    window.addEventListener('touchend', () => State.firing = false, { passive: true });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'p' || e.key === 'P') togglePause();
+      if (e.key === 'm' || e.key === 'M') toggleMute();
+      if (e.key === 'r' || e.key === 'R') restart();
+      if (!State.started && (e.key === ' ' || e.key === 'Enter')) begin();
+    });
+
+    pauseBtn.addEventListener('click', togglePause);
+    muteBtn.addEventListener('click', toggleMute);
+    restartBtn.addEventListener('click', restart);
+    startBtn.addEventListener('click', begin);
+    againBtn.addEventListener('click', () => { hideModal(gameOverModal); restart(); });
+    shareBtn.addEventListener('click', shareScore);
+
+    function setScore(n) { State.score = n; scoreText.textContent = String(n); }
+    function setTime(n) { State.time = n; timeText.textContent = Math.floor(n).toString(); }
+    function setHigh(n) { State.high = n; highText.textContent = String(n); try { localStorage.setItem('torreta_high', String(n)); } catch {} }
+    function loadHigh() { try { const v = parseInt(localStorage.getItem('torreta_high') || '0', 10); if (!isNaN(v)) setHigh(v);} catch {} }
+    function setHealth(hp) {
+      State.health = clamp(hp, 0, CONFIG.turretHealthMax);
+      const pct = (State.health / CONFIG.turretHealthMax) * 100;
+      healthFill.style.width = pct + '%';
+      healthFill.parentElement.setAttribute('aria-valuenow', Math.round(pct));
+      if (pct < 30) {
+        healthFill.style.background = 'linear-gradient(90deg, #ff3b3b 0%, #ff6a6a 100%)';
+        healthFill.style.boxShadow = 'inset 0 -4px 6px #00000055, 0 0 10px #ff4d4d77';
+      } else if (pct < 60) {
+        healthFill.style.background = 'linear-gradient(90deg, #ffc233 0%, #ffe580 100%)';
+        healthFill.style.boxShadow = 'inset 0 -4px 6px #00000055, 0 0 10px #ffd36077';
+      } else {
+        healthFill.style.background = 'linear-gradient(90deg, #24c46b 0%, #2ae98b 100%)';
+        healthFill.style.boxShadow = 'inset 0 -4px 6px #00000055, 0 0 10px #22ff9977';
+      }
+    }
+    function setIntensity() {
+      const p = Math.round(((CONFIG.spawnRate - State.currentSpawn) / (CONFIG.spawnRate - CONFIG.minSpawnRate)) * 100);
+      intensityText.textContent = clamp(p, 0, 100) + '%';
+    }
+
+    function showModal(el) { el.classList.add('show'); }
+    function hideModal(el) { el.classList.remove('show'); }
+
+    function togglePause() {
+      if (!State.started || State.over) return;
+      State.running = !State.running;
+      pauseBtn.textContent = State.running ? 'Pausar' : 'Continuar';
+      pauseBtn.setAttribute('aria-pressed', State.running ? 'false' : 'true');
+      if (State.running) loopTick();
+    }
+    function toggleMute() {
+      State.muted = !State.muted; muteBtn.textContent = 'Som: ' + (State.muted ? 'Off' : 'On');
+      muteBtn.setAttribute('aria-pressed', State.muted ? 'true' : 'false');
+    }
+    function shareScore() {
+      const text = Acertei ${State.score} pontos em ${Math.floor(State.time)}s no Torreta Pixel Art!;
+      if (navigator.share) { navigator.share({ title: 'Torreta Pixel Art', text, url: location.href }).catch(()=>{}); }
+      else { navigator.clipboard?.writeText(text + ' ' + location.href); alert('Pontuação copiada! Cole para compartilhar.'); }
+    }
+
+    function makeMeteorShape(radius, jitter=0.35) {
+      const pts = [], n = randi(8, 12);
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2;
+        const r = radius * (1 - jitter + Math.random() * jitter);
+        pts.push({ x: Math.cos(a) * r, y: Math.sin(a) * r });
+      }
+      return pts;
+    }
+    function makeCraters(count, radius) {
+      const list = [];
+      for (let i = 0; i < count; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const d = rand(radius * 0.1, radius * 0.6);
+        const r = rand(radius * 0.06, radius * 0.15);
+        list.push({ x: Math.cos(a) * d, y: Math.sin(a) * d, r });
+      }
+      return list;
+    }
+
+    function spawnEnemy(forceBoss=false) {
+      const type = forceBoss ? 3 : randi(0, 2);
+      const baseR = type === 0 ? 14 : type === 1 ? 20 : type === 2 ? 26 : 34;
+      const hpMax = type === 0 ? 12 : type === 1 ? 22 : type === 2 ? 34 : CONFIG.bossHp;
+      const y = rand(30, State.h - 30 - baseR*2);
+      const x = State.w + baseR*2 + rand(0, 60);
+      const speed = (type === 3 ? CONFIG.bossSpeed : CONFIG.enemyBaseSpeed + rand(-CONFIG.enemyVarSpeed, CONFIG.enemyVarSpeed));
+      const vyAmp = rand(6, 18), vyFreq = rand(0.6, 1.2), vyPhase = Math.random() * Math.PI * 2;
+      const spin = rand(-1.0, 1.0) * (type === 0 ? 1.2 : type === 1 ? 0.8 : type === 2 ? 0.6 : 0.4);
+      const color = type === 3 ? '#b39c7a' : (Math.random() < 0.5 ? '#8a7b6a' : '#6f6357');
+      State.enemies.push({
+        x, y, w: baseR*2, h: baseR*2,
+        r: baseR, hp: hpMax, hpMax, type, speed,
+        vyAmp, vyFreq, vyPhase,
+        angle: rand(0, Math.PI*2), spin,
+        color, shape: makeMeteorShape(baseR, 0.35), craters: makeCraters(randi(3, 6) + (type === 3 ? 2 : 0), baseR),
+        trail: [],
+      });
+    }
+    function splitMeteor(e) {
+      if (e.type <= 0 || e.type === 3) return;
+      for (let i = 0; i < 2; i++) {
+        const childType = e.type - 1;
+        const baseR = childType === 0 ? 14 : 20;
+        const hpMax = childType === 0 ? 12 : 22;
+        State.enemies.push({
+          x: e.x + rand(-6, 6), y: e.y + rand(-6, 6),
+          w: baseR*2, h: baseR*2, r: baseR, hp: hpMax, hpMax,
+          type: childType, speed: e.speed + rand(8, 20),
+          vyAmp: rand(6, 14), vyFreq: rand(0.8, 1.4), vyPhase: Math.random() * Math.PI * 2,
+          angle: rand(0, Math.PI*2), spin: rand(-1.2, 1.2),
+          color: Math.random() < 0.5 ? '#8a7b6a' : '#6f6357',
+          shape: makeMeteorShape(baseR, 0.35), craters: makeCraters(randi(3, 5), baseR),
+          trail: []
+        });
+      }
+    }
+
+    function shoot(turretIndex, angle) {
+      const t = State.time, cooldown = CONFIG.fireRate;
+      if (turretIndex === 0) { if (t - State.lastShot1 < cooldown) return; State.lastShot1 = t; }
+      else { if (t - State.lastShot2 < cooldown) return; State.lastShot2 = t; }
+      const [t1, t2] = getTurrets(); const tp = turretIndex === 0 ? t1 : t2;
+      const muzzle = 36;
+      const sx = tp.x + Math.cos(angle) * muzzle; const sy = tp.y + Math.sin(angle) * muzzle;
+      State.bullets.push({ x: sx, y: sy, vx: Math.cos(angle) * CONFIG.bulletSpeed, vy: Math.sin(angle) * CONFIG.bulletSpeed, r: CONFIG.bulletRadius });
+      sfxShoot();
+    }
+
+    function explode(x, y, size = 1, color = '#ffcf33') {
+      const count = randi(CONFIG.particlesPerHit[0], CONFIG.particlesPerHit[1]) * size;
+      for (let i = 0; i < count; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const s = rand(60, 240) * size;
+        State.particles.push({
+          x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0, max: rand(0.2, 0.6) * size,
+          color: i % 3 ? color : '#e2d7c3'
+        });
+      }
+      sfxExplosion(0.22 + Math.random()*0.12, 0.065);
+    }
+    function addShake(amount=4, duration=0.18) {
+      State.shakeA = Math.max(State.shakeA, amount);
+      State.shakeT = Math.max(State.shakeT, duration);
+    }
+
+    function bulletHitsEnemy(b, e) {
+      const rx = clamp(b.x, e.x - e.w/2, e.x + e.w/2);
+      const ry = clamp(b.y, e.y - e.h/2, e.y + e.h/2);
+      const dx = b.x - rx, dy = b.y - ry;
+      return (dx*dx + dy*dy) <= (b.r*b.r);
+    }
+    function meteorHitsCarrier(e, rect) {
+      const insetX = rect.w * 0.10;
+      const insetY = rect.h * 0.22;
+      const left = rect.x - rect.w/2 + insetX;
+      const right = rect.x + rect.w/2 - insetX;
+      const top = rect.y - rect.h/2 + insetY;
+      const bottom = rect.y + rect.h/2 - insetY;
+      const rx = clamp(e.x, left, right);
+      const ry = clamp(e.y, top, bottom);
+      const dx = e.x - rx, dy = e.y - ry;
+      return (dx*dx + dy*dy) <= (e.r * e.r * 0.95);
+    }
+
+    function begin() {
+      loadHigh(); ensureAudio();
+      setScore(0); setTime(0); setHealth(CONFIG.turretHealthMax);
+      State.enemies = []; State.bullets = []; State.particles = []; State.comets = [];
+      State.lastShot1 = State.lastShot2 = -999; State.spawnTimer = 0;
+      State.currentSpawn = CONFIG.spawnRate; State.lastSpawnDecrease = 0; State.lastBossAt = 0;
+      State.running = true; State.started = true; State.over = false;
+      hideModal(startModal); pauseBtn.textContent = 'Pausar';
+      loopTick();
+    }
+    function endGame() {
+      State.running = false; State.over = true;
+      const t = Math.floor(State.time);
+      if (State.score > State.high) setHigh(State.score);
+      finalStats.textContent = Pontuação: ${State.score} • Tempo: ${t}s • Recorde: ${State.high};
+      showModal(gameOverModal);
+      srLive.textContent = 'Fim de jogo. Pontuação ' + State.score + ', tempo ' + t + ' segundos.';
+    }
+    function restart() {
+      hideModal(gameOverModal); hideModal(startModal);
+      State.started = false; State.over = false; setScore(0); setTime(0); setHealth(CONFIG.turretHealthMax);
+      State.enemies = []; State.bullets = []; State.particles = []; State.comets = [];
+      State.running = false; pauseBtn.textContent = 'Pausar'; showModal(startModal);
+    }
+
+    function drawTurret(x, y, angle) {
+      ctx.save(); ctx.translate(x, y); ctx.rotate(angle); ctx.drawImage(turretImg, -28, -20, 56, 40); ctx.restore();
+    }
+    function drawCarrierImage(rect) {
+      ctx.save();
+      ctx.translate(rect.x, rect.y + rect.h*0.34);
+      ctx.fillStyle = "rgba(0,0,0,0.35)";
+      ctx.beginPath();
+      ctx.ellipse(0, 0, rect.w * 0.42, rect.h * 0.12, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      ctx.drawImage(carrierImg, rect.x - rect.w/2, rect.y - rect.h/2, rect.w, rect.h);
+    }
+
+    let last = performance.now();
+    function loopTick() {
+      if (!State.running) return;
+      const t = performance.now(), dt = clamp((t - last) / 1000, 0, 0.04); last = t;
+
+      updateBg(dt);
+      update(dt);
+      drawBg();
+      render(dt);
+
+      requestAnimationFrame(loopTick);
+    }
+
+    function update(dt) {
+      setTime(State.time + dt);
+
+      State.lastSpawnDecrease += dt;
+      if (State.lastSpawnDecrease >= CONFIG.spawnRateChangeEvery) {
+        State.lastSpawnDecrease = 0;
+        State.currentSpawn = Math.max(CONFIG.minSpawnRate, State.currentSpawn - CONFIG.spawnRateDecrease);
+        setIntensity();
+      }
+
+      State.spawnTimer += dt;
+      const shouldBoss = Math.floor(State.time) > 0 && (Math.floor(State.time) % CONFIG.bossEvery === 0) && Math.floor(State.time) !== State.lastBossAt;
+      if (shouldBoss) { State.lastBossAt = Math.floor(State.time); spawnEnemy(true); }
+      if (State.spawnTimer >= State.currentSpawn && State.enemies.length < CONFIG.enemyMax) { State.spawnTimer = 0; spawnEnemy(false); }
+
+      const [t1, t2] = getTurrets();
+      const a1 = Math.atan2(State.mouseY - t1.y, State.mouseX - t1.x);
+      const a2 = Math.atan2(State.mouseY - t2.y, State.mouseX - t2.x);
+      State.angle1 = a1; State.angle2 = a2;
+
+      if (State.firing) { shoot(0, a1); shoot(1, a2); }
+
+      for (let i = State.bullets.length - 1; i >= 0; i--) {
+        const b = State.bullets[i];
+        b.x += b.vx * dt; b.y += b.vy * dt;
+        if (b.x < -10 || b.x > State.w + 10 || b.y < -10 || b.y > State.h + 10) State.bullets.splice(i, 1);
+      }
+
+      const carrierRect = getCarrierRect();
+
+      for (let i = State.enemies.length - 1; i >= 0; i--) {
+        const e = State.enemies[i];
+        e.x -= e.speed * dt;
+        e.y += Math.sin(State.time * e.vyFreq + e.vyPhase) * e.vyAmp * dt;
+        e.angle += e.spin * dt;
+        e.trail.push({ x: e.x, y: e.y }); if (e.trail.length > 6) e.trail.shift();
+
+        if (meteorHitsCarrier(e, carrierRect)) {
+          const dmg = e.type === 3 ? 14 : (e.type + 1) * 3;
+          setHealth(State.health - dmg);
+          explode(e.x, e.y, e.type === 3 ? 2 : 1.2, '#f0d0a0');
+          addShake(e.type === 3 ? 9 : 5, 0.28);
+          State.enemies.splice(i, 1);
+          if (State.health <= 0) { endGame(); return; }
+          continue;
+        }
+
+        if (e.x < -e.w - 10) { State.enemies.splice(i, 1); }
+      }
+
+      for (let bi = State.bullets.length - 1; bi >= 0; bi--) {
+        const b = State.bullets[bi];
+        let hit = false;
+        for (let ei = State.enemies.length - 1; ei >= 0; ei--) {
+          const e = State.enemies[ei];
+          if (bulletHitsEnemy(b, e)) {
+            let dmg = CONFIG.baseDamage * (1 + rand(-CONFIG.damageVariance, CONFIG.damageVariance));
+            if (e.type === 1) dmg *= 0.9; if (e.type === 2) dmg *= 0.8; if (e.type === 3) dmg *= 0.7;
+            e.hp -= dmg;
+            explode(b.x, b.y, e.type === 3 ? 1.5 : 1.0, '#f0d0a0');
+            State.bullets.splice(bi, 1); hit = true;
+            if (e.hp <= 0) {
+              explode(e.x, e.y, e.type === 3 ? 2.6 : 1.6, '#f0d0a0');
+              addShake(e.type === 3 ? 8 : 5, 0.25);
+              const gain = (e.type === 3 ? 90 : (e.type + 1) * 12);
+              setScore(State.score + gain);
+              State.enemies.splice(ei, 1);
+              splitMeteor(e);
+            }
+            break;
+          }
+        }
+      }
+
+      for (let i = State.particles.length - 1; i >= 0; i--) {
+        const p = State.particles[i];
+        p.life += dt; p.x += p.vx * dt; p.y += p.vy * dt;
+        p.vx *= 0.985; p.vy = p.vy * 0.985 + 18 * dt;
+        if (p.life > p.max) State.particles.splice(i, 1);
+      }
+
+      if (State.shakeT > 0) State.shakeT -= dt;
+      else { State.shakeT = 0; State.shakeA = 0; }
+    }
+
+    function render(dt) {
+      ctx.clearRect(0, 0, State.w, State.h);
+      if (State.shakeT > 0) {
+        const s = State.shakeA * (State.shakeT / 0.18);
+        ctx.save();
+        ctx.translate(rand(-s, s), rand(-s, s));
+      }
+
+      const carrierRect = getCarrierRect();
+      if (carrierImg.complete) {
+        drawCarrierImage(carrierRect);
+      }
+
+      const [t1, t2] = getTurrets();
+      drawTurret(t1.x, t1.y, State.angle1);
+      drawTurret(t2.x, t2.y, State.angle2);
+
+      for (const b of State.bullets) {
+        ctx.fillStyle = '#fffb9c'; ctx.strokeStyle = '#e5d14a';
+        ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+      }
+
+      for (const e of State.enemies) {
+        for (let i = 0; i < e.trail.length; i++) {
+          const t = e.trail[i];
+          const a = (i + 1) / e.trail.length * 0.25;
+          ctx.globalAlpha = a; ctx.fillStyle = '#c8b79a';
+          ctx.beginPath(); ctx.arc(t.x, t.y, Math.max(1, e.r * 0.15), 0, Math.PI*2); ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+        ctx.save();
+        ctx.translate(e.x, e.y); ctx.rotate(e.angle);
+        ctx.fillStyle = e.color; ctx.strokeStyle = '#2a231b'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(e.shape[0].x, e.shape[0].y);
+        for (let k = 1; k < e.shape.length; k++) ctx.lineTo(e.shape[k].x, e.shape[k].y);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+
+        const grd = ctx.createRadialGradient(-e.r*0.3, -e.r*0.3, e.r*0.1, 0, 0, e.r*1.2);
+        grd.addColorStop(0, 'rgba(255,255,255,0.08)');
+        grd.addColorStop(1, 'rgba(0,0,0,0.35)');
+        ctx.fillStyle = grd; ctx.fill();
+
+        ctx.fillStyle = '#544a40';
+        for (const c of e.craters) { ctx.beginPath(); ctx.arc(c.x, c.y, c.r, 0, Math.PI*2); ctx.fill(); }
+
+        const pct = clamp(e.hp / e.hpMax, 0, 1);
+        ctx.translate(0, -e.r - 10);
+        ctx.fillStyle = '#0a0f25'; roundRect(ctx, -e.r, -4, e.r*2, 6, 3); ctx.fill();
+        ctx.fillStyle = pct > 0.6 ? '#2ae98b' : (pct > 0.3 ? '#ffc233' : '#ff5e66');
+        roundRect(ctx, -e.r, -4, e.r*2 * pct, 6, 3); ctx.fill();
+        ctx.restore();
+      }
+
+      for (const p of State.particles) {
+        const a = 1 - (p.life / p.max);
+        ctx.globalAlpha = clamp(a, 0, 1);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(Math.floor(p.x), Math.floor(p.y), 2, 2);
+      }
+      ctx.globalAlpha = 1;
+
+      if (State.shakeT > 0) ctx.restore();
+    }
+
+    function roundRect(ctx, x, y, w, h, r) {
+      const rr = Math.min(r, w/2, h/2);
+      ctx.beginPath();
+      ctx.moveTo(x + rr, y);
+      ctx.arcTo(x + w, y, x + w, y + h, rr);
+      ctx.arcTo(x + w, y + h, x, y + h, rr);
+      ctx.arcTo(x, y + h, x, y, rr);
+      ctx.arcTo(x, y, x + w, y, rr);
+      ctx.closePath();
+    }
+
+    function boot() {
+      resize(); loadHigh(); showModal(startModal);
+      State.mouseX = State.w * 0.6; State.mouseY = State.h * 0.5;
+      const p = Math.round(((CONFIG.spawnRate - CONFIG.spawnRate) / (CONFIG.spawnRate - CONFIG.minSpawnRate)) * 100);
+      document.getElementById('intensityText').textContent = clamp(p, 0, 100) + '%';
+    }
+    window.addEventListener('load', boot);
+  </script>
+</body>
+</html>
