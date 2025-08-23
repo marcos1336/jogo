@@ -416,7 +416,7 @@
       muteBtn.setAttribute('aria-pressed', State.muted ? 'true' : 'false');
     }
     function shareScore() {
-      const text = Acertei ${State.score} pontos em ${Math.floor(State.time)}s no Torreta Pixel Art!;
+      const text = `Acertei ${State.score} pontos em ${Math.floor(State.time)}s no Torreta Pixel Art!`;
       if (navigator.share) { navigator.share({ title: 'Torreta Pixel Art', text, url: location.href }).catch(()=>{}); }
       else { navigator.clipboard?.writeText(text + ' ' + location.href); alert('Pontuação copiada! Cole para compartilhar.'); }
     }
@@ -540,7 +540,7 @@
       State.running = false; State.over = true;
       const t = Math.floor(State.time);
       if (State.score > State.high) setHigh(State.score);
-      finalStats.textContent = Pontuação: ${State.score} • Tempo: ${t}s • Recorde: ${State.high};
+      finalStats.textContent = `Pontuação: ${State.score} • Tempo: ${t}s • Recorde: ${State.high}`;
       showModal(gameOverModal);
       srLive.textContent = 'Fim de jogo. Pontuação ' + State.score + ', tempo ' + t + ' segundos.';
     }
